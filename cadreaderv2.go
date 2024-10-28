@@ -8,6 +8,22 @@ import (
 	"github.com/Valentin-Kaiser/go-dbase/dbase"
 )
 
+type Cad02Modelo struct {
+	Depro        string
+	Nome         string
+	DTNASC       string
+	Sexo         string
+	Documento    string
+	Inscricao    string
+	DataInclusao string
+	Situacao     string
+}
+
+type Morto01Modelo struct {
+	INSCR string
+	DTEXC string
+}
+
 type Cad01Modelo struct {
 	Depro      string
 	Nome       string
@@ -62,6 +78,28 @@ func (r *Resultado) set(mud *Mudanca, valorInscr string) {
 
 const col int = 32
 
+func GetCad02ModeloPorLinha(linha *dbase.Row) Cad02Modelo {
+	campos := linha.Fields()
+	return Cad02Modelo{
+		Depro:        fmt.Sprintf("%v", campos[0].GetValue()),
+		Nome:         fmt.Sprintf("%v", campos[1].GetValue()),
+		DTNASC:       fmt.Sprintf("%v", campos[2].GetValue()),
+		Sexo:         fmt.Sprintf("%v", campos[3].GetValue()),
+		Situacao:     fmt.Sprintf("%v", campos[4].GetValue()),
+		Documento:    fmt.Sprintf("%v", campos[5].GetValue()),
+		Inscricao:    fmt.Sprintf("%v", campos[6].GetValue()),
+		DataInclusao: fmt.Sprintf("%v", campos[7].GetValue()),
+	}
+}
+
+func GetMorto01ModeloPorLinha(linha *dbase.Row) Morto01Modelo {
+	campos := linha.Fields()
+	return Morto01Modelo{
+		INSCR: fmt.Sprintf("%v", campos[13].GetValue()),
+		DTEXC: fmt.Sprintf("%v", campos[18].GetValue()),
+	}
+}
+
 func GetCAd01ModeloPorLinha(linha *dbase.Row) Cad01Modelo {
 	campos := linha.Fields()
 	return Cad01Modelo{
@@ -98,6 +136,29 @@ func GetCAd01ModeloPorLinha(linha *dbase.Row) Cad01Modelo {
 		CONV:       fmt.Sprintf("%v", campos[30].GetValue()),
 		Email:      fmt.Sprintf("%v", campos[31].GetValue()),
 	}
+}
+
+func GetCad02modelo(Filename string, inscr string) (Cad02Modelo, error) {
+	pos, err := ProcurarCad02PorInscr(Filename, inscr)
+	if err != nil {
+		return Cad02Modelo{}, err
+	}
+	tabelaCad02, err := dbase.OpenTable(&dbase.Config{
+		Filename:   Filename,
+		TrimSpaces: true,
+		Untested:   true,
+	})
+	if err != nil {
+		return Cad02Modelo{}, nil
+	}
+	defer tabelaCad02.Close()
+	tabelaCad02.GoTo(uint32(pos))
+	row, err := tabelaCad02.Row()
+	if err != nil {
+		return Cad02Modelo{}, err
+	}
+
+	return GetCad02ModeloPorLinha(row), nil
 }
 
 func GetCad01Modelo(Filename string, inscr string) (Cad01Modelo, error) {
@@ -157,7 +218,40 @@ func GetCad01Modelo(Filename string, inscr string) (Cad01Modelo, error) {
 	}, nil
 }
 
-// todo implementar de verdade
+func ProcurarCad02PorInscr(filename string, inscr string) (int, error) {
+	tabelaCad02, err := dbase.OpenTable(&dbase.Config{
+		Filename:   filename,
+		TrimSpaces: true,
+		Untested:   true,
+	})
+	if err != nil {
+		return -1, err
+	}
+	defer tabelaCad02.Close()
+	count := tabelaCad02.RowsCount()
+	var i uint32
+
+	for i = 0; i < count; i++ {
+		row, err := tabelaCad02.Next()
+		if err != nil {
+			return -1, err
+		}
+		if row.Deleted {
+			fmt.Printf("Deleted row at position: %v \n", row.Position)
+			continue
+		}
+		field_inscr := row.Field(6)
+
+		if field_inscr == nil {
+			return 0, errors.New("field not found")
+		}
+		if field_inscr.GetValue() == inscr {
+			return int(row.Position), nil
+		}
+	}
+	return 0, errors.New("none found")
+}
+
 func ProcurarCad01PorInscr(filename string, inscr string) (int, error) {
 	tableCad01, err := dbase.OpenTable(&dbase.Config{
 		Filename:   filename,
@@ -196,6 +290,52 @@ func ProcurarCad01PorInscr(filename string, inscr string) (int, error) {
 		}
 	}
 	return 0, errors.New("none found")
+}
+
+func GetAllCad01(filename string) ([]Cad01Modelo, error) {
+	tabela, err := dbase.OpenTable(&dbase.Config{
+		Filename:   filename,
+		TrimSpaces: true,
+		Untested:   true,
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer tabela.Close()
+
+	linhas, err := tabela.Rows(false, true)
+	if err != nil {
+		panic(err)
+	}
+	resp := []Cad01Modelo{}
+	for _, linha := range linhas {
+		c := GetCAd01ModeloPorLinha(linha)
+		resp = append(resp, c)
+	}
+	return resp, nil
+}
+
+func Mortos(filename string) ([]Morto01Modelo, error) {
+	tabela, err := dbase.OpenTable(&dbase.Config{
+		Filename:   filename,
+		TrimSpaces: true,
+		Untested:   true,
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer tabela.Close()
+
+	linhas, err := tabela.Rows(false, true)
+	if err != nil {
+		panic(err)
+	}
+	resp := []Morto01Modelo{}
+	for _, linha := range linhas {
+		m := GetMorto01ModeloPorLinha(linha)
+		resp = append(resp, m)
+	}
+	return resp, nil
 }
 
 func procedure(nomeArquivoAntigo string, nomeArquivoNovo string) (map[string]*Mudanca, error) {
