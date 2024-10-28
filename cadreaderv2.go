@@ -22,6 +22,7 @@ type Cad02Modelo struct {
 type Morto01Modelo struct {
 	INSCR string
 	DTEXC string
+	CATEG string
 }
 
 type Cad01Modelo struct {
@@ -97,6 +98,7 @@ func GetMorto01ModeloPorLinha(linha *dbase.Row) Morto01Modelo {
 	return Morto01Modelo{
 		INSCR: fmt.Sprintf("%v", campos[13].GetValue()),
 		DTEXC: fmt.Sprintf("%v", campos[18].GetValue()),
+		CATEG: fmt.Sprintf("%v", campos[15].GetValue()),
 	}
 }
 
